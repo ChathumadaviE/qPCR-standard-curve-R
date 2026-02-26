@@ -1,0 +1,127 @@
+---
+title: "qPCR_Standard_curve"
+author: "Chathumadavi Ediriweera"
+date: "2025-08-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+------------------------------------------------------------------------
+
+#Introduction
+
+This script will read triplicate Cq values from a PCR plate in a .csv/xslx file and plot a standard curve for log10(copynumber/μl) vs Avg Cq values.Y axis will be log10(copynumber/μl) values ranging from 7 to 0 and X axis will will be Avg Cq values.
+
+##load required Libraries
+
+```{r message=FALSE, warning=FALSE}
+library(readr)  #for reading CSV files
+library(readxl) #for reading Excel files
+library(dplyr)  #for data manipulation
+library(ggplot2) #for graphing
+```
+
+## Read y-values from CSV or Excel. Pick one from the below according to your file type
+
+Make sure your Cq values are in a excel/csv file with columns y1, y2, y3 (from column 1 - 3).
+a. For CSV file:
+
+```{r}
+#Make sure your Cq values are in a excel/csv file with triplicate values on columns y1, y2, y3 (from column 1 - 3)
+#ydata <- read_csv("your_yfile.csv")   #Add path to your Cq values file 
+```
+
+b. For Excel file:
+
+```{r}
+#Make sure your Cq values are in a excel/csv file  with triplicate values on with columns y1, y2, y3 (from column 1 - 3)
+ydata <- read_excel("/Users/Home/your_ydata.xlsx") #Add path to your Cq values file 
+
+```
+
+## Calculate average triplicate Cq values for from y values
+```{r}
+y_avg <- rowMeans(ydata, na.rm = TRUE)  #calculate average Cq value
+y_avg #view Cq average values
+```
+
+## Read x-values
+```{r}
+#Make sure your Cq values are in a excel/csv file with columns x1, x2, x3 (from column 1 - 3)
+xdata <- read_excel("/Users/Home/your_xdata.xlsx")   #Add path to your log10(copynumber/μl) file. Make sure your_xdata file has a column labeled "x" and 8 rows with data ranging from 7 - 0 
+#xdata <- read_csv("your_xfile.csv")
+xdata$x #View x values
+```
+
+## Combine Averaged x and y into a dataframe
+
+```{r}
+# assuming x_avg and ydata$y have the same length
+df <- data.frame(x= xdata$x, y= y_avg)
+df   #View dataframe
+```
+
+##Plot data using ggplot2 library
+```{r}
+ggplot(df, aes(x=x, y=y)) +            # Initialize plot with data; maps x and y variables to axes
+  geom_point(shape=21, fill="blue", size=3)+    # Add points colored blue, sized 3
+  labs(                                # Add plot tiles and axes labels
+    x= "Log Copies of DNA/μl",
+    y= "Avg Cq values",
+    title = "Average Cq values Vs Log Copies of DNA/μl"
+  ) +
+  theme_minimal()                      # Apply minimal theme plot background
+```
+
+## Make linear regression model
+
+```{r}
+my_mod <- lm(y~x, df)         #linear regression model, model y as a linear function of x
+my_mod                        #View linear regression model
+```
+##Extracting coefficients, equation, R² and primer efficiency
+
+```{r}
+intercept <- coef(my_mod)[[1]]           #Extracting intercept from linear model coefficients
+slope <- coef(my_mod)[[2]]               #Extracting slope from linear model coefficients
+R_squared <- summary(my_mod)$r.squared   #Extracting R-squared value from linear model coefficients
+efficiency= (10^(-1/slope)-1)*100      #Calculate primer efficiency
+```
+
+
+## Equation text for display
+
+```{r}
+equation_label <- paste0("y = ", round(slope,2), "x + ",round(intercept,2))  #Storing values as labels for the plot
+r2_label <- paste0("R² = ", round(R_squared,3))
+efficiency_label <- paste0("Efficiency = ", round(efficiency,2),"%")
+```
+
+
+##Make plot with regression line and annotations
+
+```{r}
+ggplot(df, aes(x=x,y=y),xlim=8, ylim=45)+
+  geom_point(shape=21, fill="blue",size=3)+
+  geom_smooth(method = "lm", se= FALSE, color="red", lwd=1)+    # Add a linear regression line (method = "lm"), no confidence interval (se=FALSE), line color red and width 1
+  labs(title = "Average Cq values Vs Log Copies of DNA/μl",
+       x= "Log Copies of DNA/μl",
+       y= "Average Cq values")+
+  annotate("text", x=5, y= 40, label=equation_label, hjust=0)+  # Add text annotations at specific coordinates, hjust=0 aligns text left
+  annotate("text", x=5, y=38, label=r2_label, hjust=0)+
+  annotate("text", x=5, y=36, label=efficiency_label, hjust=0)+
+  #xlim(0,7)+
+  #ylim(0,41)+
+  theme_minimal()
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
